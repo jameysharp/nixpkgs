@@ -71,8 +71,11 @@ let
   mkBackupService = name: cfg: 
     let
       userHome = config.users.users.${cfg.user}.home;
+      prepUnit = "borgbackup-job-prep-${name}.service";
     in nameValuePair "borgbackup-job-${name}" {
       description = "BorgBackup job ${name}";
+      requires = [ prepUnit ];
+      after = [ prepUnit ];
       path = with pkgs; [
         borgbackup openssh
       ];
@@ -98,20 +101,27 @@ let
       inherit (cfg) startAt;
     };
 
-  # Paths listed in ReadWritePaths must exist before service is started
-  mkActivationScript = name: cfg:
-    let
-      install = "install -o ${cfg.user} -g ${cfg.group}";
-    in
-      nameValuePair "borgbackup-job-${name}" (stringAfter [ "users" ] (''
-        # Eensure that the home directory already exists
-        # We can't assert createHome == true because that's not the case for root
-        cd "${config.users.users.${cfg.user}.home}"                                                                                                         
-        ${install} -d .config/borg
-        ${install} -d .cache/borg
-      '' + optionalString (isLocalPath cfg.repo) ''
-        ${install} -d ${escapeShellArg cfg.repo}
-      ''));
+  # Paths listed in ReadWritePaths must exist before service is started. These
+  # prep services don't drop privileges in case cfg.repo is in a directory the
+  # user doesn't have write access to. This step must be in a separate oneshot
+  # service, not in the job's ExecStartPre, so that the ReadWritePaths settings
+  # which we're trying to fix up don't get applied to commands which are
+  # supposed to fix them.
+  mkBackupPrepService = name: cfg:
+    nameValuePair "borgbackup-job-prep-${name}" {
+      description = "Preparing for BorgBackup job ${name}";
+      serviceConfig = {
+        # Ensure that the home directory already exists. We can't assert
+        # createHome == true because that's not the case for root.
+        WorkingDirectory = config.users.users.${cfg.user}.home;
+
+        Type = "oneshot";
+        ExecStart = map (d: "${pkgs.coreutils}/bin/install -o ${cfg.user} -g ${cfg.group} -d ${escapeShellArg d}") ([
+          ".config/borg"
+          ".cache/borg"
+        ] ++ optional (isLocalPath cfg.repo) cfg.repo);
+      };
+    };
 
   mkPassAssertion = name: cfg: {
     assertion = with cfg.encryption;
@@ -600,11 +610,10 @@ in {
         mapAttrsToList mkPassAssertion jobs
         ++ mapAttrsToList mkKeysAssertion repos;
 
-      system.activationScripts = mapAttrs' mkActivationScript jobs;
-
       systemd.services =
-        # A job named "foo" is mapped to systemd.services.borgbackup-job-foo
+        # A job named "foo" is mapped to systemd.services.borgbackup-job{-prep,}-foo
         mapAttrs' mkBackupService jobs
+        // mapAttrs' mkBackupPrepService jobs
         # A repo named "foo" is mapped to systemd.services.borgbackup-repo-foo
         // mapAttrs' mkRepoService repos;
 
