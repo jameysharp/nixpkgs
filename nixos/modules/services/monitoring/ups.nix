@@ -251,11 +251,11 @@ in
 
     power.ups.schedulerRules = mkDefault "${pkgs.nut}/etc/upssched.conf.sample";
 
-    system.activationScripts.upsSetup = stringAfter [ "users" "groups" ]
-      ''
-        # Used to store pid files of drivers.
-        mkdir -p /var/state/ups
-      '';
+    # Used to store pid files of drivers.
+    # FIXME: pid files ought to go in /run/ups instead, if that's configurable
+    systemd.tmpfiles.rules = [
+      "d /var/state/ups"
+    ];
 
   };
 }
