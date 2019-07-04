@@ -10,7 +10,11 @@ let
   stateDir = "/var/lib/mlmmj";
   spoolDir = "/var/spool/mlmmj";
   listDir = domain: list: "${spoolDir}/${domain}/${list}";
-  listCtl = domain: list: "${listDir domain list}/control";
+  listSubdirs = [
+    "incoming" "queue" "queue/discarded" "archive" "text"
+    "subconf" "unsubconf" "bounce" "control" "moderation"
+    "subscribers.d" "digesters.d" "requeue" "nomailsubs.d"
+  ];
   transport = domain: list: "${domain}--${list}@local.list.mlmmj mlmmj:${domain}/${list}";
   virtual = domain: list: "${list}@${domain} ${domain}--${list}@local.list.mlmmj";
   alias = domain: list: "${list}: \"|${pkgs.mlmmj}/bin/mlmmj-receive -L ${listDir domain list}/\"";
@@ -19,23 +23,21 @@ let
   customHeaders = domain: list: [ "List-Id: ${list}" "Reply-To: ${list}@${domain}" ];
   footer = domain: list: "To unsubscribe send a mail to ${list}+unsubscribe@${domain}";
   createList = d: l:
-    let ctlDir = listCtl d l; in
-    ''
-      for DIR in incoming queue queue/discarded archive text subconf unsubconf \
-                 bounce control moderation subscribers.d digesters.d requeue \
-                 nomailsubs.d
-      do
-             mkdir -p '${listDir d l}'/"$DIR"
-      done
-      ${pkgs.coreutils}/bin/mkdir -p ${ctlDir}
-      echo ${listAddress d l} > '${ctlDir}/listaddress'
-      [ ! -e ${ctlDir}/customheaders ] && \
-          echo "${lib.concatStringsSep "\n" (customHeaders d l)}" > '${ctlDir}/customheaders'
-      [ ! -e ${ctlDir}/footer ] && \
-          echo ${footer d l} > '${ctlDir}/footer'
-      [ ! -e ${ctlDir}/prefix ] && \
-          echo ${subjectPrefix l} > '${ctlDir}/prefix'
-    '';
+    let
+      listRoot = listDir d l;
+      makeSubdir = dir: "d ${listRoot}/${dir} - ${cfg.user} ${cfg.group}";
+    in [
+      "d ${listRoot} - ${cfg.user} ${cfg.group}"
+    ] ++ map makeSubdir listSubdirs ++ [
+      # force listaddress to the correct value even if it exists
+      "F ${listRoot}/control/listaddress - ${cfg.user} ${cfg.group} - \"${listAddress d l}\""
+
+      # only set the other control files if they don't already exist
+      "C ${listRoot}/control/customheaders - ${cfg.user} ${cfg.group} - ${
+        pkgs.writeText "${l}-customheaders" (concatStringsSep "\n" (customHeaders d l))}"
+      "f ${listRoot}/control/footer - ${cfg.user} ${cfg.group} - \"${footer d l}\""
+      "f ${listRoot}/control/prefix - ${cfg.user} ${cfg.group} - \"${subjectPrefix l}\""
+    ];
 in
 
 {
@@ -98,7 +100,6 @@ in
       name = cfg.user;
       description = "mlmmj user";
       home = stateDir;
-      createHome = true;
       uid = config.ids.uids.mlmmj;
       group = cfg.group;
       useDefaultShell = true;
@@ -128,11 +129,11 @@ in
 
     environment.systemPackages = [ pkgs.mlmmj ];
 
-    system.activationScripts.mlmmj = ''
-          ${pkgs.coreutils}/bin/mkdir -p ${stateDir} ${spoolDir}/${cfg.listDomain}
-          ${pkgs.coreutils}/bin/chown -R ${cfg.user}:${cfg.group} ${spoolDir}
-          ${concatMapLines (createList cfg.listDomain) cfg.mailLists}
-      '';
+    systemd.tmpfiles.rules = [
+      "d ${stateDir} 700 ${cfg.user} ${cfg.group}"
+      "d ${spoolDir} - ${cfg.user} ${cfg.group}"
+      "d ${spoolDir}/${cfg.listDomain} - ${cfg.user} ${cfg.group}"
+    ] ++ concatMap (createList cfg.listDomain) cfg.mailLists;
 
     systemd.services."mlmmj-maintd" = {
       description = "mlmmj maintenance daemon";
