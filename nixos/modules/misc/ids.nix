@@ -248,7 +248,7 @@
       postsrsd = 220;
       opendkim = 221;
       dspam = 222;
-      gale = 223;
+      # gale = 223; # unused
       matrix-synapse = 224;
       rspamd = 225;
       rmilter = 226;
@@ -556,7 +556,7 @@
       postsrsd = 220;
       opendkim = 221;
       dspam = 222;
-      gale = 223;
+      # gale = 223; # unused
       matrix-synapse = 224;
       rspamd = 225;
       rmilter = 226;
