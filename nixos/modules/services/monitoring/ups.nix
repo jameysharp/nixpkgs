@@ -257,24 +257,5 @@ in
         mkdir -p /var/state/ups
       '';
 
-
-/*
-    users.users = [
-      { name = "nut";
-        uid = 84;
-        home = "/var/lib/nut";
-        createHome = true;
-        group = "nut";
-        description = "UPnP A/V Media Server user";
-      }
-    ];
-
-    users.groups = [
-      { name = "nut";
-        gid = 84;
-      }
-    ];
-*/
-
   };
 }
