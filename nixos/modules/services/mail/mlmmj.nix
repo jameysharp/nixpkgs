@@ -4,8 +4,6 @@ with lib;
 
 let
 
-  concatMapLines = f: l: lib.concatStringsSep "\n" (map f l);
-
   cfg = config.services.mlmmj;
   stateDir = "/var/lib/mlmmj";
   spoolDir = "/var/spool/mlmmj";
@@ -117,9 +115,9 @@ in
         mlmmj unix - n n - - pipe flags=ORhu user=mlmmj argv=${pkgs.mlmmj}/bin/mlmmj-receive -F -L ${spoolDir}/$nexthop
       '';
 
-      extraAliases = concatMapLines (alias cfg.listDomain) cfg.mailLists;
-      transport = concatMapLines (transport cfg.listDomain) cfg.mailLists;
-      virtual = concatMapLines (virtual cfg.listDomain) cfg.mailLists;
+      extraAliases = concatMapStringsSep "\n" (alias cfg.listDomain) cfg.mailLists;
+      transport = concatMapStringsSep "\n" (transport cfg.listDomain) cfg.mailLists;
+      virtual = concatMapStringsSep "\n" (virtual cfg.listDomain) cfg.mailLists;
       virtualMapType = "hash";
 
       extraConfig = ''
