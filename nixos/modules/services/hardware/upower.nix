@@ -85,10 +85,9 @@ in
           };
       };
 
-    system.activationScripts.upower =
-      ''
-        mkdir -m 0755 -p /var/lib/upower
-      '';
+    systemd.tmpfiles.rules = [
+      "d /var/lib/upower"
+    ];
 
     # The upower daemon seems to get stuck after doing a suspend
     # (i.e. subsequent suspend requests will say "Sleep has already
