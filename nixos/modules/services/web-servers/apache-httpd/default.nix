@@ -667,6 +667,12 @@ in
         date.timezone = "${config.time.timeZone}"
       '';
 
+    systemd.tmpfiles.rules = [
+      "d ${mainCfg.stateDir} 750 root ${mainCfg.group}"
+      "d ${mainCfg.stateDir}/runtime 750 root ${mainCfg.group}"
+      "d ${mainCfg.logDir} 700"
+    ];
+
     systemd.services.httpd =
       { description = "Apache HTTPD";
 
@@ -684,37 +690,28 @@ in
           // optionalAttrs mainCfg.enableMellon { LD_LIBRARY_PATH  = "${pkgs.xmlsec}/lib"; }
           // (listToAttrs (concatMap (svc: svc.globalEnvVars) allSubservices));
 
-        preStart =
-          ''
-            mkdir -m 0750 -p ${mainCfg.stateDir}
-            [ $(id -u) != 0 ] || chown root.${mainCfg.group} ${mainCfg.stateDir}
+        serviceConfig = {
+          # Get rid of old semaphores.  These tend to accumulate across
+          # server restarts, eventually preventing it from restarting
+          # successfully.
+          User = mainCfg.user;
+          Group = mainCfg.group;
+          RemoveIPC = true;
 
-            mkdir -m 0750 -p "${mainCfg.stateDir}/runtime"
-            [ $(id -u) != 0 ] || chown root.${mainCfg.group} "${mainCfg.stateDir}/runtime"
+          # Note: all these commands run initially as root, because of the "!"
+          # prefix. They should drop privileges as needed.
+          ExecStartPre = concatMap (svc:
+            optional (svc.startupScript != "") "!${svc.startupScript}"
+          ) allSubservices;
+          ExecStart = "!@${httpd}/bin/httpd httpd -f ${httpdConf}";
+          ExecStop = "!${httpd}/bin/httpd -f ${httpdConf} -k graceful-stop";
+          ExecReload = "!${httpd}/bin/httpd -f ${httpdConf} -k graceful";
 
-            mkdir -m 0700 -p ${mainCfg.logDir}
-
-            # Get rid of old semaphores.  These tend to accumulate across
-            # server restarts, eventually preventing it from restarting
-            # successfully.
-            for i in $(${pkgs.utillinux}/bin/ipcs -s | grep ' ${mainCfg.user} ' | cut -f2 -d ' '); do
-                ${pkgs.utillinux}/bin/ipcrm -s $i
-            done
-
-            # Run the startup hooks for the subservices.
-            for i in ${toString (map (svn: svn.startupScript) allSubservices)}; do
-                echo Running Apache startup hook $i...
-                $i
-            done
-          '';
-
-        serviceConfig.ExecStart = "@${httpd}/bin/httpd httpd -f ${httpdConf}";
-        serviceConfig.ExecStop = "${httpd}/bin/httpd -f ${httpdConf} -k graceful-stop";
-        serviceConfig.ExecReload = "${httpd}/bin/httpd -f ${httpdConf} -k graceful";
-        serviceConfig.Type = "forking";
-        serviceConfig.PIDFile = "${mainCfg.stateDir}/httpd.pid";
-        serviceConfig.Restart = "always";
-        serviceConfig.RestartSec = "5s";
+          Type = "forking";
+          PIDFile = "${mainCfg.stateDir}/httpd.pid";
+          Restart = "always";
+          RestartSec = "5s";
+        };
       };
 
   };
