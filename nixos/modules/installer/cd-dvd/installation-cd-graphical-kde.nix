@@ -23,7 +23,7 @@ with lib;
     kate
   ];
 
-  system.activationScripts.installerDesktop = let
+  systemd.tmpfiles.rules = let
 
     manualDesktopFile = pkgs.writeScript "nixos-manual.desktop" ''
       [Desktop Entry]
@@ -34,11 +34,10 @@ with lib;
       Icon=text-html
     '';
 
-  in ''
-    mkdir -p /root/Desktop
-    ln -sfT ${manualDesktopFile} /root/Desktop/nixos-manual.desktop
-    ln -sfT ${pkgs.konsole}/share/applications/org.kde.konsole.desktop /root/Desktop/org.kde.konsole.desktop
-    ln -sfT ${pkgs.gparted}/share/applications/gparted.desktop /root/Desktop/gparted.desktop
-  '';
+  in [
+    "L+ /root/Desktop/nixos-manual.desktop - - - - ${manualDesktopFile}"
+    "L+ /root/Desktop/org.kde.konsole.desktop - - - - ${pkgs.konsole}/share/applications/org.kde.konsole.desktop"
+    "L+ /root/Desktop/gparted.desktop - - - - ${pkgs.gparted}/share/applications/gparted.desktop"
+  ];
 
 }
