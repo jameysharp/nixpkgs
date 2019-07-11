@@ -44,13 +44,12 @@ in
 
     hardware.firmware = [ package ];
 
-    system.activationScripts.setup-amdgpu-pro = ''
-      mkdir -p /run/lib
-      ln -sfn ${package}/lib ${package.libCompatDir}
-      ln -sfn ${package} /run/amdgpu-pro
-    '' + optionalString opengl.driSupport32Bit ''
-      ln -sfn ${package32}/lib ${package32.libCompatDir}
-    '';
+    systemd.tmpfiles.rules = [
+      "L+ ${package.libCompatDir} - - - - ${package}/lib"
+      "L+ /run/amdgpu-pro - - - - ${package}"
+    ] ++ optionals opengl.driSupport32Bit [
+      "L+ ${package32.libCompatDir} - - - - ${package32}/lib"
+    ];
 
     system.requiredKernelConfig = with config.lib.kernelConfig; [
       (isYes "KALLSYMS_ALL")
