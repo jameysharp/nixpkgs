@@ -160,49 +160,49 @@ in
 
       services.postgresql.enable = cfg.localDatabaseCreate;
 
-      # The systemd service will fail to execute the preStart hook
-      # if the WorkingDirectory does not exist
-      system.activationScripts.mattermost = ''
-        mkdir -p ${cfg.statePath}
-      '';
+      systemd.tmpfiles.rules = [
+        "d ${cfg.statePath}"
+        "d ${cfg.statePath}/data"
+        "d ${cfg.statePath}/config"
+        "d ${cfg.statePath}/logs"
+        "L+ ${cfg.statePath}/bin - - - - ${pkgs.mattermost}/bin"
+        "L+ ${cfg.statePath}/fonts - - - - ${pkgs.mattermost}/fonts"
+        "L+ ${cfg.statePath}/i18n - - - - ${pkgs.mattermost}/i18n"
+        "L+ ${cfg.statePath}/templates - - - - ${pkgs.mattermost}/templates"
+        "L+ ${cfg.statePath}/client - - - - ${pkgs.mattermost}/client"
+      ] ++ lib.optionals (!cfg.mutableConfig) [
+        "L+ ${cfg.statePath}/config/config.json - - - - ${mattermostConfJSON}"
+      ] ++ [
+        "Z ${cfg.statePath} ~750 ${cfg.user} ${cfg.group}"
+      ];
 
       systemd.services.mattermost = {
         description = "Mattermost chat service";
         wantedBy = [ "multi-user.target" ];
         after = [ "network.target" "postgresql.service" ];
 
-        preStart = ''
-          mkdir -p ${cfg.statePath}/{data,config,logs}
-          ln -sf ${pkgs.mattermost}/{bin,fonts,i18n,templates,client} ${cfg.statePath}
-        '' + lib.optionalString (!cfg.mutableConfig) ''
-          ln -sf ${mattermostConfJSON} ${cfg.statePath}/config/config.json
-        '' + lib.optionalString cfg.mutableConfig ''
-          if ! test -e "${cfg.statePath}/config/.initial-created"; then
-            rm -f ${cfg.statePath}/config/config.json
-            cp ${mattermostConfJSON} ${cfg.statePath}/config/config.json
-            touch ${cfg.statePath}/config/.initial-created
+        preStart = lib.optionalString cfg.mutableConfig ''
+          if ! test -e config/.initial-created; then
+            cp -f ${mattermostConfJSON} config/config.json
+            touch config/.initial-created
           fi
         '' + lib.optionalString cfg.localDatabaseCreate ''
-          if ! test -e "${cfg.statePath}/.db-created"; then
+          if ! test -e .db-created; then
             ${pkgs.sudo}/bin/sudo -u ${config.services.postgresql.superUser} \
               ${config.services.postgresql.package}/bin/psql postgres -c \
                 "CREATE ROLE ${cfg.localDatabaseUser} WITH LOGIN NOCREATEDB NOCREATEROLE ENCRYPTED PASSWORD '${cfg.localDatabasePassword}'"
             ${pkgs.sudo}/bin/sudo -u ${config.services.postgresql.superUser} \
               ${config.services.postgresql.package}/bin/createdb \
                 --owner ${cfg.localDatabaseUser} ${cfg.localDatabaseName}
-            touch ${cfg.statePath}/.db-created
+            touch .db-created
           fi
-        '' + ''
-          chown ${cfg.user}:${cfg.group} -R ${cfg.statePath}
-          chmod u+rw,g+r,o-rwx -R ${cfg.statePath}
         '';
 
         serviceConfig = {
-          PermissionsStartOnly = true;
           User = cfg.user;
           Group = cfg.group;
           ExecStart = "${pkgs.mattermost}/bin/mattermost";
-          WorkingDirectory = "${cfg.statePath}";
+          WorkingDirectory = cfg.statePath;
           Restart = "always";
           RestartSec = "10";
           LimitNOFILE = "49152";
