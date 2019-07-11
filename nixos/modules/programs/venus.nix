@@ -150,15 +150,12 @@ in
 
   config = mkIf cfg.enable {
 
-    system.activationScripts.venus =
-      ''
-        mkdir -p ${cfg.outputDirectory}
-        chown ${cfg.user}:${cfg.group} ${cfg.outputDirectory} -R
-        rm -rf ${cfg.cacheDirectory}/theme
-        mkdir -p ${cfg.cacheDirectory}/theme
-        cp -R ${cfg.outputTheme}/* ${cfg.cacheDirectory}/theme
-        chown ${cfg.user}:${cfg.group} ${cfg.cacheDirectory} -R
-      '';
+    systemd.tmpfiles.rules = [
+      "d ${cfg.outputDirectory}"
+      "Z ${cfg.outputDirectory} - ${cfg.user} ${cfg.group}"
+      "R ${cfg.cacheDirectory}/theme"
+      "C ${cfg.cacheDirectory}/theme - ${cfg.user} ${cfg.group} - ${cfg.outputTheme}/*"
+    ];
 
     systemd.services.venus =
       { description = "Planet Venus Feed Reader";
