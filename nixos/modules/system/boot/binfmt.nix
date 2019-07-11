@@ -20,8 +20,8 @@ let
                  optionalString fixBinary "F";
   in ":${name}:${type}:${offset'}:${magicOrExtension}:${mask'}:${interpreter}:${flags}";
 
-  activationSnippet = name: { interpreter, ... }:
-    "ln -sf ${interpreter} /run/binfmt/${name}";
+  tmpfilesRules = name: { interpreter, ... }:
+    "L+ /run/binfmt/${name} - - - - ${interpreter}";
 
   getEmulator = system: (lib.systems.elaborate { inherit system; }).emulator pkgs;
 
@@ -249,13 +249,14 @@ in {
     nix.sandboxPaths = lib.mkIf (cfg.emulatedSystems != [])
       ([ "/run/binfmt" ] ++ (map (system: dirOf (dirOf (getEmulator system))) cfg.emulatedSystems));
 
-    environment.etc."binfmt.d/nixos.conf".source = builtins.toFile "binfmt_nixos.conf"
-      (lib.concatStringsSep "\n" (lib.mapAttrsToList makeBinfmtLine config.boot.binfmt.registrations));
-    system.activationScripts.binfmt = ''
-      mkdir -p -m 0755 /run/binfmt
-      ${lib.concatStringsSep "\n" (lib.mapAttrsToList activationSnippet config.boot.binfmt.registrations)}
-    '';
-    systemd.additionalUpstreamSystemUnits = lib.mkIf (config.boot.binfmt.registrations != {})
+    environment.etc."binfmt.d/nixos.conf" = {
+      enable = cfg.registrations != {};
+      text = lib.concatStringsSep "\n" (lib.mapAttrsToList makeBinfmtLine cfg.registrations);
+    };
+
+    systemd.tmpfiles.rules = lib.mapAttrsToList tmpfilesRules cfg.registrations;
+
+    systemd.additionalUpstreamSystemUnits = lib.mkIf (cfg.registrations != {})
       [ "proc-sys-fs-binfmt_misc.automount"
         "proc-sys-fs-binfmt_misc.mount"
       ];
