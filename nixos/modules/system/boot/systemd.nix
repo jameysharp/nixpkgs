@@ -242,40 +242,40 @@ let
           environment.PATH = config.path;
         }
         (mkIf (config.preStart != "")
-          { serviceConfig.ExecStartPre = makeJobScript "${name}-pre-start" ''
+          { serviceConfig.ExecStartPre = singleton (makeJobScript "${name}-pre-start" ''
               #! ${pkgs.runtimeShell} -e
               ${config.preStart}
-            '';
+            '');
           })
         (mkIf (config.script != "")
-          { serviceConfig.ExecStart = makeJobScript "${name}-start" ''
+          { serviceConfig.ExecStart = singleton (makeJobScript "${name}-start" ''
               #! ${pkgs.runtimeShell} -e
               ${config.script}
-            '' + " " + config.scriptArgs;
+            '' + " " + config.scriptArgs);
           })
         (mkIf (config.postStart != "")
-          { serviceConfig.ExecStartPost = makeJobScript "${name}-post-start" ''
+          { serviceConfig.ExecStartPost = singleton (makeJobScript "${name}-post-start" ''
               #! ${pkgs.runtimeShell} -e
               ${config.postStart}
-            '';
+            '');
           })
         (mkIf (config.reload != "")
-          { serviceConfig.ExecReload = makeJobScript "${name}-reload" ''
+          { serviceConfig.ExecReload = singleton (makeJobScript "${name}-reload" ''
               #! ${pkgs.runtimeShell} -e
               ${config.reload}
-            '';
+            '');
           })
         (mkIf (config.preStop != "")
-          { serviceConfig.ExecStop = makeJobScript "${name}-pre-stop" ''
+          { serviceConfig.ExecStop = singleton (makeJobScript "${name}-pre-stop" ''
               #! ${pkgs.runtimeShell} -e
               ${config.preStop}
-            '';
+            '');
           })
         (mkIf (config.postStop != "")
-          { serviceConfig.ExecStopPost = makeJobScript "${name}-post-stop" ''
+          { serviceConfig.ExecStopPost = singleton (makeJobScript "${name}-post-stop" ''
               #! ${pkgs.runtimeShell} -e
               ${config.postStop}
-            '';
+            '');
           })
       ];
   };
