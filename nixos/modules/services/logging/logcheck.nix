@@ -221,10 +221,10 @@ in
         extraGroups = cfg.extraGroups;
       });
 
-    system.activationScripts.logcheck = ''
-      mkdir -m 700 -p /var/{lib,lock}/logcheck
-      chown ${cfg.user} /var/{lib,lock}/logcheck
-    '';
+    systemd.tmpfiles.rules = [
+      "d /var/lib/logcheck 700 ${cfg.user}"
+      "d /var/lock/logcheck 700 ${cfg.user}"
+    ];
 
     services.cron.systemCronJobs =
         let withTime = name: {timeArgs, ...}: timeArgs != null;
