@@ -14,10 +14,9 @@ in {
     environment.systemPackages = [ pkgs.maxx ];
 
     # there is hardcoded path in binaries
-    system.activationScripts.setup-maxx = ''
-      mkdir -p /opt
-      ln -sfn ${pkgs.maxx}/opt/MaXX /opt
-    '';
+    systemd.tmpfiles.rules = [
+      "L+ /opt/MaXX - - - - ${pkgs.maxx}/opt/MaXX"
+    ];
 
     services.xserver.desktopManager.session = [
     { name = "MaXX";
