@@ -119,11 +119,6 @@ in
 
     environment.systemPackages = [ pkgs.trousers ];
 
-#    system.activationScripts.tcsd =
-#      ''
-#        chown ${cfg.user}:${cfg.group} ${tcsdConf}
-#      '';
-
     systemd.services.tcsd = {
       description = "TCSD";
       after = [ "systemd-udev-settle.service" ];
