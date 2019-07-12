@@ -299,7 +299,7 @@ in
     # and other configurations. If the file is destroyed by an environment
     # activation then it must be rebuilt so that applications which interface
     # with /etc/resolv.conf directly don't break.
-    system.activationScripts.resolvconf = stringAfter [ "etc" "specialfs" "var" ]
+    system.activationScripts.resolvconf = stringAfter [ "etc" "specialfs" ]
       ''
         # Systemd resolved controls its own resolv.conf
         rm -f /run/resolvconf/interfaces/systemd
