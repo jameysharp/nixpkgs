@@ -185,18 +185,14 @@ in
 
     systemd.tmpfiles.rules = [
       "d /var/tmp 1777"
-    ];
-
-    system.activationScripts.usrbinenv = if config.environment.usrbinenv != null
-      then ''
-        mkdir -m 0755 -p /usr/bin
-        ln -sfn ${config.environment.usrbinenv} /usr/bin/.env.tmp
-        mv /usr/bin/.env.tmp /usr/bin/env # atomically replace /usr/bin/env
-      ''
-      else ''
-        rm -f /usr/bin/env
-        rmdir --ignore-fail-on-non-empty /usr/bin /usr
-      '';
+    ] ++ (if config.environment.usrbinenv != null
+      then [ "L+ /usr/bin/env - - - - ${config.environment.usrbinenv}" ]
+      else [
+        "r /usr/bin/env"
+        "r- /usr/bin"
+        "r- /usr"
+      ]
+    );
 
     system.activationScripts.specialfs =
       ''
