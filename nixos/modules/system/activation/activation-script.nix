@@ -171,13 +171,6 @@ in
 
     system.activationScripts.stdio = ""; # obsolete
 
-    system.activationScripts.var =
-      ''
-        # Various log/runtime directories.
-
-        mkdir -m 1777 -p /var/tmp
-      '';
-
     systemd.mounts = [
       # Empty, immutable home directory of many system accounts.
       {
@@ -188,6 +181,10 @@ in
         type = "tmpfs";
         options = "ro,mode=0555";
       }
+    ];
+
+    systemd.tmpfiles.rules = [
+      "d /var/tmp 1777"
     ];
 
     system.activationScripts.usrbinenv = if config.environment.usrbinenv != null
