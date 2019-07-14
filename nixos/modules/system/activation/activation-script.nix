@@ -176,16 +176,19 @@ in
         # Various log/runtime directories.
 
         mkdir -m 1777 -p /var/tmp
-
-        # Empty, immutable home directory of many system accounts.
-        mkdir -p /var/empty
-        # Make sure it's really empty
-        ${pkgs.e2fsprogs}/bin/chattr -f -i /var/empty || true
-        find /var/empty -mindepth 1 -delete
-        chmod 0555 /var/empty
-        chown root:root /var/empty
-        ${pkgs.e2fsprogs}/bin/chattr -f +i /var/empty || true
       '';
+
+    systemd.mounts = [
+      # Empty, immutable home directory of many system accounts.
+      {
+        wantedBy = [ "local-fs.target" ];
+        before = [ "local-fs.target" ];
+        where = "/var/empty";
+        what = "tmpfs";
+        type = "tmpfs";
+        options = "ro,mode=0555";
+      }
+    ];
 
     system.activationScripts.usrbinenv = if config.environment.usrbinenv != null
       then ''
