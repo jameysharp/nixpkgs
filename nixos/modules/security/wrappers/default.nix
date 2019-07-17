@@ -160,10 +160,12 @@ in
       fusermount3.source = "${pkgs.fuse3}/bin/fusermount3";
     };
 
-    boot.specialFileSystems.${parentWrapperDir} = {
-      fsType = "tmpfs";
-      options = [ "nodev" ];
-    };
+    systemd.mounts = [{
+      where = parentWrapperDir;
+      what = "tmpfs";
+      type = "tmpfs";
+      options = "nodev";
+    }];
 
     # Make sure our wrapperDir exports to the PATH env variable when
     # initializing the shell
@@ -172,14 +174,28 @@ in
       export PATH="${wrapperDir}:$PATH"
     '';
 
-    ###### setcap activation script
-    system.activationScripts.wrappers =
-      lib.stringAfter [ "specialfs" "users" ]
-        ''
-          # Look in the system path and in the default profile for
-          # programs to be wrapped.
-          WRAPPER_PATH=${config.system.path}/bin:${config.system.path}/sbin
+    systemd.services.nixos-wrappers-setup =
+      {
+        description = "Setup Security Wrappers";
 
+        # Setting up the wrappers only requires that we have access to the Nix
+        # store, which is guaranteed if systemd is running, and that our tmpfs
+        # is mounted.
+        unitConfig.DefaultDependencies = false;
+        unitConfig.RequiresMountsFor = [ parentWrapperDir ];
+
+        # Allow general purpose daemons to use the setuid wrappers by ordering
+        # before `basic.target`. Anything before that can't rely on much
+        # anyway, so it should be okay if the wrappers aren't set up yet.
+        wantedBy = [ "basic.target" ];
+        before = [ "basic.target" ];
+
+        # Ensure switch-to-configuration restarts this unit if the wrappers
+        # configuration changes
+        serviceConfig.RemainAfterExit = true;
+
+        serviceConfig.Type = "oneshot";
+        script = ''
           # We want to place the tmpdirs for the wrappers to the parent dir.
           wrapperDir=$(mktemp --directory --tmpdir="${parentWrapperDir}" wrappers.XXXXXXXXXX)
           chmod a+rx $wrapperDir
@@ -198,5 +214,6 @@ in
             ln --symbolic $wrapperDir ${wrapperDir}
           fi
         '';
+      };
   };
 }
